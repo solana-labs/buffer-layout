@@ -1,8 +1,13 @@
 # Change Log
 
+## [2.0.0] - 2021-07-08
+
+* Improve [browser compatibility][pr#28] by adding a browser polyfill
+  for the Node browser module and loosening types from Buffer to Uint8Array.
+
 ## [1.2.2] - 2021-07-05
 
-* Improve [browser compatibility][pr#26] by eliminating a dependence on
+* Improve [browser compatibility][pr#27] by eliminating a dependence on
   the Node assert module.
 
 ## [1.2.1] - 2021-04-29
