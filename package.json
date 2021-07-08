@@ -1,5 +1,5 @@
 {
-  "name": "buffer-layout",
+  "name": "@solana/buffer-layout",
   "version": "3.0.0",
   "description": "Translation between JavaScript values and Buffers",
   "keywords": [
