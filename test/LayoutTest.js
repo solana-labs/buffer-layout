@@ -2004,14 +2004,14 @@ suite('Layout', function() {
     });
     test('basics', function() {
       const b = Buffer.from('', 'hex');
-      assert.strictEqual(lo.const(true).decode(b), true);
-      assert.strictEqual(lo.const(undefined).decode(b), undefined);
+      assert.strictEqual(lo.constant(true).decode(b), true);
+      assert.strictEqual(lo.constant(undefined).decode(b), undefined);
       const obj = {a: 23};
-      assert.strictEqual(lo.const(obj).decode(b), obj);
+      assert.strictEqual(lo.constant(obj).decode(b), obj);
       /* No return value to check, but this shouldn't throw an
        * exception (which it would if it tried to mutate the
        * zero-length buffer). */
-      assert.equal(lo.const(32).encode(b), 0);
+      assert.equal(lo.constant(32).encode(b), 0);
       assert.equal(b.length, 0);
     });
   });

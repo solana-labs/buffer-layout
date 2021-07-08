@@ -1,5 +1,10 @@
 # Change Log
 
+## [3.0.0] - 2021-07-08
+
+* **API** Renamed `const` function to [constant][doc:constant].
+* Migrate to TypeScript and make type definitions available from npm.
+
 ## [2.0.0] - 2021-07-08
 
 * Improve [browser compatibility][pr#28] by adding a browser polyfill

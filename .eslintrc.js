@@ -1,13 +1,17 @@
 module.exports = {
-  extends: 'google',
-  env: {
-    node: true,
-    mocha: true
-  },
+  root: true,
+  parser: '@typescript-eslint/parser',
   plugins: [
-    'pabigot'
+    '@typescript-eslint',
+  ],
+  extends: [
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
   ],
   rules: {
+    '@typescript-eslint/no-explicit-any': 'off',
+    '@typescript-eslint/explicit-module-boundary-types': 'off',
+    '@typescript-eslint/no-unused-vars': 'off',
     'guard-for-in': 'off',
     'prefer-rest-params': 'off',
     'prefer-spread': 'off',
@@ -23,12 +27,6 @@ module.exports = {
     'no-irregular-whitespace': ['error', {skipComments: true}],
     'no-multi-spaces': ['error', {ignoreEOLComments: true}],
     'operator-linebreak': ['error', 'before'],
-    'pabigot/affixed-ids': ['error', {
-      allowedSuffixes: [
-        '_dCel',
-        '_ppt'
-      ]
-    }],
     quotes: ['error', 'single', {
       avoidEscape: true,
       allowTemplateLiterals: true
@@ -40,6 +38,6 @@ module.exports = {
     yoda: ['error', 'always', {exceptRange: true}]
   },
   parserOptions: {
-    sourceType: 'module'
+    project: './tsconfig.json',
   }
-}
+};

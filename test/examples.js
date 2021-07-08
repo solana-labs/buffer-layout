@@ -214,8 +214,8 @@ struct ds {
     const s16 = un.addVariant('h'.charCodeAt(0), lo.s16(), 's16');
     const s48 = un.addVariant('Q'.charCodeAt(0), lo.s48(), 's48');
     const cstr = un.addVariant('s'.charCodeAt(0), lo.cstr(), 'str');
-    const tr = un.addVariant('T'.charCodeAt(0), lo.const(true), 'b');
-    const fa = un.addVariant('F'.charCodeAt(0), lo.const(false), 'b');
+    const tr = un.addVariant('T'.charCodeAt(0), lo.constant(true), 'b');
+    const fa = un.addVariant('F'.charCodeAt(0), lo.constant(false), 'b');
     const b = Buffer.alloc(1 + 6);
     un.configGetSourceVariant(function(src) {
       if (src.hasOwnProperty('b')) {
