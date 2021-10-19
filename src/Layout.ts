@@ -137,14 +137,14 @@ import {Buffer} from 'buffer';
 /* Convenience type alias for objects.
  *
  * @ignore */
-export type LayoutObject = {
-  [key: string]: any,
+export interface LayoutObject {
+  [key: string]: any;
 }
 
 /* Check if a value is a Uint8Array.
  *
  * @ignore */
-export function checkUint8Array(b: Uint8Array) {
+export function checkUint8Array(b: Uint8Array): void {
   if (!(b instanceof Uint8Array)) {
     throw new TypeError('b must be a Uint8Array');
   }
@@ -174,7 +174,7 @@ export function uint8ArrayToBuffer(b: Uint8Array): Buffer {
  *
  * @abstract
  */
-export class Layout {
+export class Layout<T> {
   span: number;
   property?: string;
   boundConstructor_?: any;
@@ -237,7 +237,7 @@ export class Layout {
    *
    * @abstract
    */
-  decode(b: Uint8Array, offset?: number): any {
+  decode(b: Uint8Array, offset?: number): T {
     throw new Error('Layout is abstract');
   }
 
@@ -263,7 +263,7 @@ export class Layout {
    *
    * @abstract
    */
-  encode(src: any, b: Uint8Array, offset?: number): number {
+  encode(src: T, b: Uint8Array, offset?: number): number {
     throw new Error('Layout is abstract');
   }
 
@@ -306,8 +306,8 @@ export class Layout {
    * @returns {Layout} - the copy with {@link Layout#property|property}
    * set to `property`.
    */
-  replicate(property: string): Layout {
-    const rv = Object.create(this.constructor.prototype);
+  replicate(property: string): this {
+    const rv = Object.create(this.constructor.prototype) as this;
     Object.assign(rv, this);
     rv.property = property;
     return rv;
@@ -333,7 +333,7 @@ export class Layout {
    *
    * @return {(Object|undefined)}
    */
-  fromArray(values: Array<any>): LayoutObject | undefined {
+  fromArray(values: any[]): LayoutObject | undefined {
     return undefined;
   }
 }
@@ -343,7 +343,7 @@ export class Layout {
  * (such as one for which the value was unacceptable).
  *
  * @ignore */
-export function nameWithProperty(name: string, lo: any) {
+export function nameWithProperty(name: string, lo: { property?: string }): string {
   if (lo.property) {
     return name + '[' + lo.property + ']';
   }
@@ -377,7 +377,7 @@ export function nameWithProperty(name: string, lo: any) {
  * @param {Layout} layout - the {@link Layout} instance used to encode
  * instances of `Class`.
  */
-export function bindConstructorLayout(Class: any, layout: Layout) {
+export function bindConstructorLayout<T>(Class: any, layout: Layout<T>): void {
   if ('function' !== typeof Class) {
     throw new TypeError('Class must be constructor');
   }
@@ -394,13 +394,13 @@ export function bindConstructorLayout(Class: any, layout: Layout) {
   layout.boundConstructor_ = Class;
   layout.makeDestinationObject = (() => new Class());
   Object.defineProperty(Class.prototype, 'encode', {
-    value: function(b: Uint8Array, offset?: number) {
-      return layout.encode(this, b, offset);
+    value (b: Uint8Array, offset?: number): number {
+      return layout.encode(this as T, b, offset);
     },
     writable: true,
   });
   Object.defineProperty(Class, 'decode', {
-    value: function(b: Uint8Array, offset?: number) {
+    value (b: Uint8Array, offset?: number): T {
       return layout.decode(b, offset);
     },
     writable: true,
@@ -428,7 +428,7 @@ export function bindConstructorLayout(Class: any, layout: Layout) {
  * @abstract
  * @augments {Layout}
  */
-export class ExternalLayout extends Layout {
+export class ExternalLayout extends Layout<number> {
   /**
    * Return `true` iff the external layout decodes to an unsigned
    * integer layout.
@@ -463,10 +463,7 @@ export class ExternalLayout extends Layout {
 export class GreedyCount extends ExternalLayout {
   elementSpan: number;
 
-  constructor(elementSpan: number, property?: string) {
-    if (undefined === elementSpan) {
-      elementSpan = 1;
-    }
+  constructor(elementSpan = 1, property?: string) {
     if ((!Number.isInteger(elementSpan)) || (0 >= elementSpan)) {
       throw new TypeError('elementSpan must be a (positive) integer');
     }
@@ -479,22 +476,19 @@ export class GreedyCount extends ExternalLayout {
   }
 
   /** @override */
-  isCount() {
+  isCount(): boolean {
     return true;
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number): number {
+  decode(b: Uint8Array, offset = 0): number {
     checkUint8Array(b);
-    if (undefined === offset) {
-      offset = 0;
-    }
     const rem = b.length - offset;
     return Math.floor(rem / this.elementSpan);
   }
 
   /** @override */
-  encode(src: any, b: Uint8Array, offset?: number): number {
+  encode(src: number, b: Uint8Array, offset?: number): number {
     return 0;
   }
 }
@@ -520,16 +514,14 @@ export class GreedyCount extends ExternalLayout {
  * @augments {Layout}
  */
 export class OffsetLayout extends ExternalLayout {
-  layout: Layout;
+  layout: Layout<number>;
   offset: number;
-  constructor(layout: Layout, offset?: number, property?: string) {
+  constructor(layout: Layout<number>, offset = 0, property?: string) {
     if (!(layout instanceof Layout)) {
       throw new TypeError('layout must be a Layout');
     }
 
-    if (undefined === offset) {
-      offset = 0;
-    } else if (!Number.isInteger(offset)) {
+    if (!Number.isInteger(offset)) {
       throw new TypeError('offset must be integer or undefined');
     }
 
@@ -548,24 +540,18 @@ export class OffsetLayout extends ExternalLayout {
   }
 
   /** @override */
-  isCount() {
+  isCount(): boolean {
     return ((this.layout instanceof UInt)
             || (this.layout instanceof UIntBE));
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number) {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): number {
     return this.layout.decode(b, offset + this.offset);
   }
 
   /** @override */
-  encode(src: any, b: Uint8Array, offset?: number) {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: number, b: Uint8Array, offset = 0): number {
     return this.layout.encode(src, b, offset + this.offset);
   }
 }
@@ -586,7 +572,7 @@ export class OffsetLayout extends ExternalLayout {
  *
  * @augments {Layout}
  */
-export class UInt extends Layout {
+export class UInt extends Layout<number> {
   constructor(span: number, property?: string) {
     super(span, property);
     if (6 < this.span) {
@@ -595,18 +581,12 @@ export class UInt extends Layout {
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): number {
     return uint8ArrayToBuffer(b).readUIntLE(offset, this.span);
   }
 
   /** @override */
-  encode(src: number, b: Uint8Array, offset?: number) {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: number, b: Uint8Array, offset = 0): number {
     uint8ArrayToBuffer(b).writeUIntLE(src, offset, this.span);
     return this.span;
   }
@@ -628,7 +608,7 @@ export class UInt extends Layout {
  *
  * @augments {Layout}
  */
-export class UIntBE extends Layout {
+export class UIntBE extends Layout<number> {
   constructor(span: number, property?: string) {
     super(span, property);
     if (6 < this.span) {
@@ -637,18 +617,12 @@ export class UIntBE extends Layout {
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): number {
     return uint8ArrayToBuffer(b).readUIntBE(offset, this.span);
   }
 
   /** @override */
-  encode(src: number, b: Uint8Array, offset?: number) {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: number, b: Uint8Array, offset = 0): number {
     uint8ArrayToBuffer(b).writeUIntBE(src, offset, this.span);
     return this.span;
   }
@@ -670,7 +644,7 @@ export class UIntBE extends Layout {
  *
  * @augments {Layout}
  */
-export class Int extends Layout {
+export class Int extends Layout<number> {
   constructor(span: number, property?: string) {
     super(span, property);
     if (6 < this.span) {
@@ -679,18 +653,12 @@ export class Int extends Layout {
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number) {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): number {
     return uint8ArrayToBuffer(b).readIntLE(offset, this.span);
   }
 
   /** @override */
-  encode(src: number, b: Uint8Array, offset?: number) {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: number, b: Uint8Array, offset = 0): number {
     uint8ArrayToBuffer(b).writeIntLE(src, offset, this.span);
     return this.span;
   }
@@ -712,7 +680,7 @@ export class Int extends Layout {
  *
  * @augments {Layout}
  */
-export class IntBE extends Layout {
+export class IntBE extends Layout<number> {
   constructor(span: number, property?: string) {
     super(span, property);
     if (6 < this.span) {
@@ -721,18 +689,12 @@ export class IntBE extends Layout {
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number) {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): number {
     return uint8ArrayToBuffer(b).readIntBE(offset, this.span);
   }
 
   /** @override */
-  encode(src: number, b: Uint8Array, offset?: number) {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: number, b: Uint8Array, offset = 0): number {
     uint8ArrayToBuffer(b).writeIntBE(src, offset, this.span);
     return this.span;
   }
@@ -742,7 +704,7 @@ const V2E32 = Math.pow(2, 32);
 
 /* True modulus high and low 32-bit words, where low word is always
  * non-negative. */
-function divmodInt64(src: number) {
+function divmodInt64(src: number): { hi32: number; lo32: number; } {
   const hi32 = Math.floor(src / V2E32);
   const lo32 = src - (hi32 * V2E32);
   return {hi32, lo32};
@@ -763,16 +725,13 @@ function roundedInt64(hi32: number, lo32: number): number {
  *
  * @augments {Layout}
  */
-export class NearUInt64 extends Layout {
+export class NearUInt64 extends Layout<number> {
   constructor(property?: string) {
     super(8, property);
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number) {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): number {
     const buffer = uint8ArrayToBuffer(b);
     const lo32 = buffer.readUInt32LE(offset);
     const hi32 = buffer.readUInt32LE(offset + 4);
@@ -780,10 +739,7 @@ export class NearUInt64 extends Layout {
   }
 
   /** @override */
-  encode(src: number, b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: number, b: Uint8Array, offset = 0): number {
     const split = divmodInt64(src);
     const buffer = uint8ArrayToBuffer(b);
     buffer.writeUInt32LE(split.lo32, offset);
@@ -803,16 +759,13 @@ export class NearUInt64 extends Layout {
  *
  * @augments {Layout}
  */
-export class NearUInt64BE extends Layout {
+export class NearUInt64BE extends Layout<number> {
   constructor(property?: string) {
     super(8, property);
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): number {
     const buffer = uint8ArrayToBuffer(b);
     const hi32 = buffer.readUInt32BE(offset);
     const lo32 = buffer.readUInt32BE(offset + 4);
@@ -820,10 +773,7 @@ export class NearUInt64BE extends Layout {
   }
 
   /** @override */
-  encode(src: number, b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: number, b: Uint8Array, offset = 0): number {
     const split = divmodInt64(src);
     const buffer = uint8ArrayToBuffer(b);
     buffer.writeUInt32BE(split.hi32, offset);
@@ -843,16 +793,13 @@ export class NearUInt64BE extends Layout {
  *
  * @augments {Layout}
  */
-export class NearInt64 extends Layout {
+export class NearInt64 extends Layout<number> {
   constructor(property?: string) {
     super(8, property);
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): number {
     const buffer = uint8ArrayToBuffer(b);
     const lo32 = buffer.readUInt32LE(offset);
     const hi32 = buffer.readInt32LE(offset + 4);
@@ -860,10 +807,7 @@ export class NearInt64 extends Layout {
   }
 
   /** @override */
-  encode(src: number, b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: number, b: Uint8Array, offset = 0): number {
     const split = divmodInt64(src);
     const buffer = uint8ArrayToBuffer(b);
     buffer.writeUInt32LE(split.lo32, offset);
@@ -883,16 +827,13 @@ export class NearInt64 extends Layout {
  *
  * @augments {Layout}
  */
-export class NearInt64BE extends Layout {
+export class NearInt64BE extends Layout<number> {
   constructor(property?: string) {
     super(8, property);
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): number {
     const buffer = uint8ArrayToBuffer(b);
     const hi32 = buffer.readInt32BE(offset);
     const lo32 = buffer.readUInt32BE(offset + 4);
@@ -900,10 +841,7 @@ export class NearInt64BE extends Layout {
   }
 
   /** @override */
-  encode(src: number, b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: number, b: Uint8Array, offset = 0): number {
     const split = divmodInt64(src);
     const buffer = uint8ArrayToBuffer(b);
     buffer.writeInt32BE(split.hi32, offset);
@@ -922,24 +860,18 @@ export class NearInt64BE extends Layout {
  *
  * @augments {Layout}
  */
-export class Float extends Layout {
+export class Float extends Layout<number> {
   constructor(property?: string) {
     super(4, property);
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): number {
     return uint8ArrayToBuffer(b).readFloatLE(offset);
   }
 
   /** @override */
-  encode(src: number, b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: number, b: Uint8Array, offset = 0): number {
     uint8ArrayToBuffer(b).writeFloatLE(src, offset);
     return 4;
   }
@@ -955,24 +887,18 @@ export class Float extends Layout {
  *
  * @augments {Layout}
  */
-export class FloatBE extends Layout {
+export class FloatBE extends Layout<number> {
   constructor(property?: string) {
     super(4, property);
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): number {
     return uint8ArrayToBuffer(b).readFloatBE(offset);
   }
 
   /** @override */
-  encode(src: number, b: Uint8Array, offset?: number) {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: number, b: Uint8Array, offset = 0): number {
     uint8ArrayToBuffer(b).writeFloatBE(src, offset);
     return 4;
   }
@@ -988,24 +914,18 @@ export class FloatBE extends Layout {
  *
  * @augments {Layout}
  */
-export class Double extends Layout {
+export class Double extends Layout<number> {
   constructor(property?: string) {
     super(8, property);
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): number {
     return uint8ArrayToBuffer(b).readDoubleLE(offset);
   }
 
   /** @override */
-  encode(src: number, b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: number, b: Uint8Array, offset = 0): number {
     uint8ArrayToBuffer(b).writeDoubleLE(src, offset);
     return 8;
   }
@@ -1021,24 +941,18 @@ export class Double extends Layout {
  *
  * @augments {Layout}
  */
-export class DoubleBE extends Layout {
+export class DoubleBE extends Layout<number> {
   constructor(property?: string) {
     super(8, property);
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): number {
     return uint8ArrayToBuffer(b).readDoubleBE(offset);
   }
 
   /** @override */
-  encode(src: number, b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: number, b: Uint8Array, offset = 0): number {
     uint8ArrayToBuffer(b).writeDoubleBE(src, offset);
     return 8;
   }
@@ -1061,11 +975,11 @@ export class DoubleBE extends Layout {
  *
  * @augments {Layout}
  */
-export class Sequence extends Layout {
-  elementLayout: Layout;
+export class Sequence<T> extends Layout<T[]> {
+  elementLayout: Layout<T>;
   count: number | ExternalLayout;
 
-  constructor(elementLayout: Layout, count: number | ExternalLayout, property?: string) {
+  constructor(elementLayout: Layout<T>, count: number | ExternalLayout, property?: string) {
     if (!(elementLayout instanceof Layout)) {
       throw new TypeError('elementLayout must be a Layout');
     }
@@ -1094,17 +1008,14 @@ export class Sequence extends Layout {
   }
 
   /** @override */
-  getSpan(b: Uint8Array, offset?: number) {
+  getSpan(b: Uint8Array, offset = 0): number {
     if (0 <= this.span) {
       return this.span;
-    }
-    if (undefined === offset) {
-      offset = 0;
     }
     let span = 0;
     let count = this.count;
     if (count instanceof ExternalLayout) {
-      count = count.decode(b, offset) as number;
+      count = count.decode(b, offset);
     }
     if (0 < this.elementLayout.span) {
       span = count * this.elementLayout.span;
@@ -1119,15 +1030,12 @@ export class Sequence extends Layout {
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number): Array<any> {
-    if (undefined === offset) {
-      offset = 0;
-    }
-    const rv: any[] = [];
+  decode(b: Uint8Array, offset = 0): T[] {
+    const rv: T[] = [];
     let i = 0;
     let count = this.count;
     if (count instanceof ExternalLayout) {
-      count = count.decode(b, offset) as number;
+      count = count.decode(b, offset);
     }
     while (i < count) {
       rv.push(this.elementLayout.decode(b, offset));
@@ -1147,10 +1055,7 @@ export class Sequence extends Layout {
    * **NOTE** If {@link Layout#count|count} is an instance of {@link
    * ExternalLayout} then the length of `src` will be encoded as the
    * count after `src` is encoded. */
-  encode(src: Array<any>, b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: T[], b: Uint8Array, offset = 0): number {
     const elo = this.elementLayout;
     const span: number = src.reduce((span, v) => {
       return span + elo.encode(v, b, offset + span);
@@ -1194,11 +1099,11 @@ export class Sequence extends Layout {
  *
  * @augments {Layout}
  */
-export class Structure extends Layout {
-  fields: Layout[];
+export class Structure extends Layout<LayoutObject> {
+  fields: Layout<LayoutObject>[];
   decodePrefixes: boolean;
-  
-  constructor(fields: Layout[], property?: string, decodePrefixes?: boolean) {
+
+  constructor(fields: Layout<LayoutObject>[], property?: string, decodePrefixes?: boolean) {
     if (!(Array.isArray(fields)
           && fields.reduce((acc, v) => acc && (v instanceof Layout), true))) {
       throw new TypeError('fields must be array of Layout instances');
@@ -1250,18 +1155,15 @@ export class Structure extends Layout {
   }
 
   /** @override */
-  getSpan(b: Uint8Array, offset?: number): number {
+  getSpan(b: Uint8Array, offset = 0): number {
     if (0 <= this.span) {
       return this.span;
-    }
-    if (undefined === offset) {
-      offset = 0;
     }
     let span = 0;
     try {
       span = this.fields.reduce((span, fd) => {
         const fsp = fd.getSpan(b, offset);
-        (offset as number) += fsp;
+        offset += fsp;
         return span + fsp;
       }, 0);
     } catch (e) {
@@ -1271,11 +1173,8 @@ export class Structure extends Layout {
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number): LayoutObject {
+  decode(b: Uint8Array, offset = 0): LayoutObject {
     checkUint8Array(b);
-    if (undefined === offset) {
-      offset = 0;
-    }
     const dest = this.makeDestinationObject();
     for (const fd of this.fields) {
       if (undefined !== fd.property) {
@@ -1295,10 +1194,7 @@ export class Structure extends Layout {
    * If `src` is missing a property for a member with a defined {@link
    * Layout#property|property} the corresponding region of the buffer is
    * left unmodified. */
-  encode(src: LayoutObject, b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: LayoutObject, b: Uint8Array, offset = 0): number {
     const firstOffset = offset;
     let lastOffset = 0;
     let lastWrote = 0;
@@ -1327,7 +1223,7 @@ export class Structure extends Layout {
   }
 
   /** @override */
-  fromArray(values: Array<any>): LayoutObject {
+  fromArray(values: any[]): LayoutObject {
     const dest = this.makeDestinationObject();
     for (const fd of this.fields) {
       if ((undefined !== fd.property)
@@ -1346,7 +1242,7 @@ export class Structure extends Layout {
    * @return {Layout} - the layout associated with `property`, or
    * undefined if there is no such property.
    */
-  layoutFor(property: string): Layout | undefined {
+  layoutFor(property: string): Layout<LayoutObject> | undefined {
     if ('string' !== typeof property) {
       throw new TypeError('property must be string');
     }
@@ -1402,7 +1298,7 @@ export class Structure extends Layout {
  *
  * @abstract
  */
-export class UnionDiscriminator {
+export class UnionDiscriminator<T = any> {
   property: string;
   constructor(property: string) {
     /** The {@link Layout#property|property} to be used when the
@@ -1416,7 +1312,7 @@ export class UnionDiscriminator {
    *
    * The implementation of this method need not reference the buffer if
    * variant information is available through other means. */
-  decode(b?: Uint8Array, offset?: number): any {
+  decode(b?: Uint8Array, offset?: number): T {
     throw new Error('UnionDiscriminator is abstract');
   }
 
@@ -1424,7 +1320,7 @@ export class UnionDiscriminator {
    *
    * The implementation of this method need not store the value if
    * variant information is maintained through other means. */
-  encode(src: any, b: Uint8Array, offset?: number) {
+  encode(src: T, b: Uint8Array, offset?: number): number {
     throw new Error('UnionDiscriminator is abstract');
   }
 }
@@ -1446,7 +1342,7 @@ export class UnionDiscriminator {
  *
  * @augments {UnionDiscriminator}
  */
-export class UnionLayoutDiscriminator extends UnionDiscriminator {
+export class UnionLayoutDiscriminator extends UnionDiscriminator<number> {
   layout: ExternalLayout;
   constructor(layout: ExternalLayout, property?: string) {
     if (!((layout instanceof ExternalLayout)
@@ -1463,11 +1359,11 @@ export class UnionLayoutDiscriminator extends UnionDiscriminator {
 
   /** Delegate decoding to {@link UnionLayoutDiscriminator#layout|layout}. */
   decode(b: Uint8Array, offset?: number): number {
-    return this.layout.decode(b, offset) as number;
+    return this.layout.decode(b, offset);
   }
 
   /** Delegate encoding to {@link UnionLayoutDiscriminator#layout|layout}. */
-  encode(src: any, b: Uint8Array, offset?: number): any {
+  encode(src: number, b: Uint8Array, offset?: number): number {
     return this.layout.encode(src, b, offset);
   }
 }
@@ -1531,21 +1427,25 @@ export class UnionLayoutDiscriminator extends UnionDiscriminator {
  *
  * @augments {Layout}
  */
-export class Union extends Layout {
+export class Union extends Layout<LayoutObject> {
+  property: string;
   discriminator: UnionDiscriminator;
   usesPrefixDiscriminator: boolean;
-  defaultLayout: Layout | null;
+  defaultLayout: Layout<LayoutObject> | null;
   registry: {[key: number]: VariantLayout};
 
   getSourceVariant: (src: LayoutObject) => VariantLayout | undefined;
   configGetSourceVariant: (getSourceVariant: (src: LayoutObject) => VariantLayout | undefined) => void;
 
-  constructor(discr: Layout | UnionDiscriminator, defaultLayout: Layout | null, property: string) {
-    const upv = ((discr instanceof UInt)
-               || (discr instanceof UIntBE));
-    let discriminator;
-    if (upv) {
-      discriminator = new UnionLayoutDiscriminator(new OffsetLayout(discr as Layout));
+  constructor(
+      discr: Layout<LayoutObject> | UnionDiscriminator,
+      defaultLayout: Layout<LayoutObject> | null,
+      property: string
+  ) {
+    let discriminator: UnionDiscriminator;
+    if ((discr instanceof UInt)
+        || (discr instanceof UIntBE)) {
+      discriminator = new UnionLayoutDiscriminator(new OffsetLayout(discr));
     } else if ((discr instanceof ExternalLayout)
                && discr.isCount()) {
       discriminator = new UnionLayoutDiscriminator(discr);
@@ -1578,7 +1478,8 @@ export class Union extends Layout {
     let span = -1;
     if (defaultLayout) {
       span = defaultLayout.span;
-      if ((0 <= span) && upv) {
+      if ((0 <= span) && ((discr instanceof UInt)
+          || (discr instanceof UIntBE))) {
         span += (discriminator as UnionLayoutDiscriminator).layout.span;
       }
     }
@@ -1599,7 +1500,8 @@ export class Union extends Layout {
      *
      * If `false` the discriminator is obtained from somewhere
      * else. */
-    this.usesPrefixDiscriminator = upv;
+    this.usesPrefixDiscriminator = (discr instanceof UInt)
+        || (discr instanceof UIntBE);
 
     /** The layout for non-discriminator content when the value of the
      * discriminator is not recognized.
@@ -1638,7 +1540,7 @@ export class Union extends Layout {
      * @returns {(undefined|VariantLayout)} The default variant
      * (`undefined`) or first registered variant that uses a property
      * available in `src`. */
-    this.getSourceVariant = function(src: any): VariantLayout | undefined {
+    this.getSourceVariant = function(src) {
       return boundGetSourceVariant(src);
     };
 
@@ -1661,12 +1563,9 @@ export class Union extends Layout {
   }
 
   /** @override */
-  getSpan(b: Uint8Array, offset?: number) {
+  getSpan(b: Uint8Array, offset = 0): number {
     if (0 <= this.span) {
       return this.span;
-    }
-    if (undefined === offset) {
-      offset = 0;
     }
     /* Default layouts always have non-negative span, so we don't have
      * one and we have to recognize the variant which will in turn
@@ -1736,23 +1635,21 @@ export class Union extends Layout {
    * value is an instance of that variant, with no explicit
    * discriminator.  Otherwise the {@link Union#defaultLayout|default
    * layout} is used to decode the content. */
-  decode(b: Uint8Array, offset?: number) {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): LayoutObject {
     let dest: LayoutObject;
     const dlo = this.discriminator;
     const discr = dlo.decode(b, offset);
     const clo = this.registry[discr];
     if (undefined === clo) {
-      const defaultLayout = this.defaultLayout as any;
+      const defaultLayout = this.defaultLayout;
       let contentOffset = 0;
       if (this.usesPrefixDiscriminator) {
         contentOffset = (dlo as UnionLayoutDiscriminator).layout.span;
       }
       dest = this.makeDestinationObject();
       dest[dlo.property] = discr;
-      dest[defaultLayout.property] = defaultLayout.decode(b, offset + contentOffset);
+      // @FIXME: defaultLayout and defaultLayout.property aren't guaranteed
+      dest[defaultLayout!.property!] = defaultLayout!.decode(b, offset + contentOffset);
     } else {
       dest = clo.decode(b, offset);
     }
@@ -1765,22 +1662,19 @@ export class Union extends Layout {
    * {@link Union#defaultLayout|default layout}.  To encode variants
    * use the appropriate variant-specific {@link VariantLayout#encode}
    * method. */
-  encode(src: LayoutObject, b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: LayoutObject, b: Uint8Array, offset = 0): number {
     const vlo = this.getSourceVariant(src);
     if (undefined === vlo) {
       const dlo = this.discriminator;
       // this.defaultLayout is not undefined when vlo is undefined
-      const clo = this.defaultLayout as Layout;
+      const clo = this.defaultLayout!;
       let contentOffset = 0;
       if (this.usesPrefixDiscriminator) {
         contentOffset = (dlo as UnionLayoutDiscriminator).layout.span;
       }
       dlo.encode(src[dlo.property], b, offset);
       // clo.property is not undefined when vlo is undefined
-      return contentOffset + clo.encode(src[clo.property as string], b, offset + contentOffset);
+      return contentOffset + clo.encode(src[clo.property!], b, offset + contentOffset);
     }
     return vlo.encode(src, b, offset);
   }
@@ -1798,7 +1692,7 @@ export class Union extends Layout {
    * Layout#property|property}.
    *
    * @return {VariantLayout} */
-  addVariant(variant: number, layout: Layout, property: string): VariantLayout {
+  addVariant(variant: number, layout: Layout<LayoutObject>, property: string): VariantLayout {
     const rv = new VariantLayout(this, variant, layout, property);
     this.registry[variant] = rv;
     return rv;
@@ -1818,12 +1712,9 @@ export class Union extends Layout {
    *
    * @return {({VariantLayout}|undefined)}
    */
-  getVariant(vb: Uint8Array | number, offset?: number): VariantLayout | undefined {
+  getVariant(vb: Uint8Array | number, offset = 0): VariantLayout | undefined {
     let variant: number;
     if (vb instanceof Uint8Array) {
-      if (undefined === offset) {
-        offset = 0;
-      }
       variant = this.discriminator.decode(vb, offset);
     } else {
       variant = vb;
@@ -1861,11 +1752,12 @@ export class Union extends Layout {
  *
  * @augments {Layout}
  */
-export class VariantLayout extends Layout {
+export class VariantLayout extends Layout<LayoutObject> {
+  property: string;
   union: Union;
   variant: number;
-  layout: Layout | null;
-  constructor(union: Union, variant: number, layout: Layout | null, property: string) {
+  layout: Layout<LayoutObject> | null;
+  constructor(union: Union, variant: number, layout: Layout<LayoutObject> | null, property: string) {
     if (!(union instanceof Union)) {
       throw new TypeError('union must be a Union');
     }
@@ -1915,14 +1807,11 @@ export class VariantLayout extends Layout {
   }
 
   /** @override */
-  getSpan(b: Uint8Array, offset?: number) {
+  getSpan(b: Uint8Array, offset = 0): number {
     if (0 <= this.span) {
       /* Will be equal to the containing union span if that is not
        * variable. */
       return this.span;
-    }
-    if (undefined === offset) {
-      offset = 0;
     }
     let contentOffset = 0;
     if (this.union.usesPrefixDiscriminator) {
@@ -1937,11 +1826,8 @@ export class VariantLayout extends Layout {
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number): LayoutObject {
+  decode(b: Uint8Array, offset = 0): LayoutObject {
     const dest = this.makeDestinationObject();
-    if (undefined === offset) {
-      offset = 0;
-    }
     if (this !== this.union.getVariant(b, offset)) {
       throw new Error('variant mismatch');
     }
@@ -1949,12 +1835,10 @@ export class VariantLayout extends Layout {
     if (this.union.usesPrefixDiscriminator) {
       contentOffset = (this.union.discriminator as UnionLayoutDiscriminator).layout.span;
     }
-    // VariantLayout property is never undefined
-    const property = this.property as string;
     if (this.layout) {
-      dest[property] = this.layout.decode(b, offset + contentOffset);
-    } else if (property) {
-      dest[property] = true;
+      dest[this.property] = this.layout.decode(b, offset + contentOffset);
+    } else if (this.property) {
+      dest[this.property] = true;
     } else if (this.union.usesPrefixDiscriminator) {
       dest[this.union.discriminator.property] = this.variant;
     }
@@ -1962,24 +1846,19 @@ export class VariantLayout extends Layout {
   }
 
   /** @override */
-  encode(src: LayoutObject, b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: LayoutObject, b: Uint8Array, offset = 0): number {
     let contentOffset = 0;
     if (this.union.usesPrefixDiscriminator) {
       contentOffset = (this.union.discriminator as UnionLayoutDiscriminator).layout.span;
     }
-    // VariantLayout property is never undefined
-    const property = this.property as string;
     if (this.layout
-        && (!Object.prototype.hasOwnProperty.call(src, property))) {
-      throw new TypeError('variant lacks property ' + property);
+        && (!Object.prototype.hasOwnProperty.call(src, this.property))) {
+      throw new TypeError('variant lacks property ' + this.property);
     }
     this.union.discriminator.encode(this.variant, b, offset);
     let span = contentOffset;
     if (this.layout) {
-      this.layout.encode(src[property], b, offset + contentOffset);
+      this.layout.encode(src[this.property], b, offset + contentOffset);
       span += this.layout.getSpan(b, offset + contentOffset);
       if ((0 <= this.union.span)
           && (span > this.union.span)) {
@@ -1991,7 +1870,7 @@ export class VariantLayout extends Layout {
 
   /** Delegate {@link Layout#fromArray|fromArray} to {@link
    * VariantLayout#layout|layout}. */
-  fromArray(values: Array<any>): LayoutObject | undefined {
+  fromArray(values: any[]): LayoutObject | undefined {
     if (this.layout) {
       return this.layout.fromArray(values);
     }
@@ -2043,15 +1922,15 @@ function fixBitwiseResult(v: number): number {
  *
  * @augments {Layout}
  */
-export class BitStructure extends Layout {
+export class BitStructure extends Layout<LayoutObject> {
   fields: BitField[];
-  word: Layout;
+  word: UInt | UIntBE;
   msb: boolean;
 
-  _packedSetValue: (v: number) => BitStructure;
+  _packedSetValue: (v: number) => this;
   _packedGetValue: () => number;
 
-  constructor(word: Layout, msb: boolean | string, property?: string) {
+  constructor(word: UInt | UIntBE, msb: boolean | string, property?: string) {
     if (!((word instanceof UInt)
           || (word instanceof UIntBE))) {
       throw new TypeError('word must be a UInt or UIntBE layout');
@@ -2092,7 +1971,7 @@ export class BitStructure extends Layout {
      * instance property because we don't want anything to change the
      * value without going through the mutator. */
     let value = 0;
-    this._packedSetValue = function(v: number): BitStructure {
+    this._packedSetValue = function(v: number) {
       value = fixBitwiseResult(v);
       return this;
     };
@@ -2102,16 +1981,13 @@ export class BitStructure extends Layout {
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number): LayoutObject {
+  decode(b: Uint8Array, offset = 0): LayoutObject {
     const dest = this.makeDestinationObject();
-    if (undefined === offset) {
-      offset = 0;
-    }
     const value = this.word.decode(b, offset);
     this._packedSetValue(value);
     for (const fd of this.fields) {
       if (undefined !== fd.property) {
-        dest[fd.property] = fd.decode(value);
+        dest[fd.property] = fd.decode(b);
       }
     }
     return dest;
@@ -2122,10 +1998,7 @@ export class BitStructure extends Layout {
    * If `src` is missing a property for a member with a defined {@link
    * Layout#property|property} the corresponding region of the packed
    * value is left unmodified.  Unused bits are also left unmodified. */
-  encode(src: LayoutObject, b: Uint8Array, offset?: number): number {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: LayoutObject, b: Uint8Array, offset = 0): number {
     const value = this.word.decode(b, offset);
     this._packedSetValue(value);
     for (const fd of this.fields) {
@@ -2148,7 +2021,7 @@ export class BitStructure extends Layout {
    * Layout#property|property}.
    *
    * @return {BitField} */
-  addField(bits: number, property: string) {
+  addField(bits: number, property: string): BitField {
     const bf = new BitField(this, bits, property);
     this.fields.push(bf);
     return bf;
@@ -2161,7 +2034,8 @@ export class BitStructure extends Layout {
    * Layout#property|property}.
    *
    * @return {Boolean} */
-  addBoolean(property: string) {
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  addBoolean(property: string): Boolean {
     // This is my Boolean, not the Javascript one.
     // eslint-disable-next-line no-new-wrappers
     const bf = new Boolean(this, property);
@@ -2276,7 +2150,7 @@ export class BitField {
 
   /** Store a value into the corresponding subsequence of the containing
    * bit field. */
-  decode(b?: Uint8Array, offset?: number): any {
+  decode(b?: Uint8Array, offset?: number): unknown {
     const word = this.container._packedGetValue();
     const wordValue = fixBitwiseResult(word & this.wordMask);
     const value = wordValue >>> this.start;
@@ -2288,8 +2162,9 @@ export class BitField {
    *
    * **NOTE** This is not a specialization of {@link
    * Layout#encode|Layout.encode} and there is no return value. */
-  encode(value: number) {
-    if ((!Number.isInteger(value))
+  encode(value: unknown): void {
+    if ('number' !== typeof value
+        || !Number.isInteger(value)
         || (value !== fixBitwiseResult(value & this.valueMask))) {
       throw new TypeError(nameWithProperty('BitField.encode', this)
                           + ' value must be integer not exceeding ' + this.valueMask);
@@ -2326,17 +2201,17 @@ export class Boolean extends BitField {
   /** Override {@link BitField#decode|decode} for {@link Boolean|Boolean}.
    *
    * @returns {boolean} */
-  decode(b: Uint8Array, offset?: number): boolean {
-    return !!BitField.prototype.decode.call(this, b, offset);
+  decode(b?: Uint8Array, offset?: number): boolean {
+    return !!super.decode(b, offset);
   }
 
   /** @override */
-  encode(value: number | boolean) {
+  encode(value: number | boolean): void {
     if ('boolean' === typeof value) {
       // BitField requires integer values
       value = +value;
     }
-    return BitField.prototype.encode.call(this, value);
+    super.encode(value);
   }
 }
 /* eslint-enable no-extend-native */
@@ -2355,7 +2230,7 @@ export class Boolean extends BitField {
  *
  * @augments {Layout}
  */
-export class Blob extends Layout {
+export class Blob extends Layout<Uint8Array> {
   length: number | ExternalLayout;
   constructor(length: number | ExternalLayout, property?: string) {
     if (!(((length instanceof ExternalLayout) && length.isCount())
@@ -2379,22 +2254,19 @@ export class Blob extends Layout {
   }
 
   /** @override */
-  getSpan(b: Uint8Array, offset?: number) {
+  getSpan(b: Uint8Array, offset?: number): number {
     let span = this.span;
     if (0 > span) {
-      span = (this.length as ExternalLayout).decode(b, offset) as number;
+      span = (this.length as ExternalLayout).decode(b, offset);
     }
     return span;
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number) {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): Uint8Array {
     let span = this.span;
     if (0 > span) {
-      span = (this.length as ExternalLayout).decode(b, offset) as number;
+      span = (this.length as ExternalLayout).decode(b, offset);
     }
     return uint8ArrayToBuffer(b).slice(offset, offset + span);
   }
@@ -2404,7 +2276,7 @@ export class Blob extends Layout {
    * **NOTE** If {@link Layout#count|count} is an instance of {@link
    * ExternalLayout} then the length of `src` will be encoded as the
    * count after `src` is encoded. */
-  encode(src: Uint8Array, b: Uint8Array, offset: number) {
+  encode(src: Uint8Array, b: Uint8Array, offset: number): number {
     let span = this.length;
     if (this.length instanceof ExternalLayout) {
       span = src.length;
@@ -2438,17 +2310,14 @@ export class Blob extends Layout {
  *
  * @augments {Layout}
  */
-export class CString extends Layout {
+export class CString extends Layout<string> {
   constructor(property?: string) {
     super(-1, property);
   }
 
   /** @override */
-  getSpan(b: Uint8Array, offset?: number) {
+  getSpan(b: Uint8Array, offset = 0): number {
     checkUint8Array(b);
-    if (undefined === offset) {
-      offset = 0;
-    }
     let idx = offset;
     while ((idx < b.length) && (0 !== b[idx])) {
       idx += 1;
@@ -2457,24 +2326,18 @@ export class CString extends Layout {
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number) {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): string {
     const span = this.getSpan(b, offset);
     return uint8ArrayToBuffer(b).slice(offset, offset + span - 1).toString('utf-8');
   }
 
   /** @override */
-  encode(src: string, b: Uint8Array, offset?: number) {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: string, b: Uint8Array, offset = 0): number {
     /* Must force this to a string, lest it be a number and the
      * "utf8-encoding" below actually allocate a buffer of length
      * src */
     if ('string' !== typeof src) {
-      src = (src as any).toString();
+      src = String(src);
     }
     const srcb = Buffer.from(src, 'utf8');
     const span = srcb.length;
@@ -2507,7 +2370,7 @@ export class CString extends Layout {
  *
  * @augments {Layout}
  */
-export class UTF8 extends Layout {
+export class UTF8 extends Layout<string> {
   maxSpan: number;
   constructor(maxSpan?: number | string, property?: string) {
     if (('string' === typeof maxSpan) && (undefined === property)) {
@@ -2534,19 +2397,13 @@ export class UTF8 extends Layout {
   }
 
   /** @override */
-  getSpan(b: Uint8Array, offset?: number) {
+  getSpan(b: Uint8Array, offset = 0): number {
     checkUint8Array(b);
-    if (undefined === offset) {
-      offset = 0;
-    }
     return b.length - offset;
   }
 
   /** @override */
-  decode(b: Uint8Array, offset?: number) {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  decode(b: Uint8Array, offset = 0): string {
     const span = this.getSpan(b, offset);
     if ((0 <= this.maxSpan)
         && (this.maxSpan < span)) {
@@ -2556,17 +2413,14 @@ export class UTF8 extends Layout {
   }
 
   /** @override */
-  encode(src: string | LayoutObject, b: Uint8Array, offset?: number) {
-    if (undefined === offset) {
-      offset = 0;
-    }
+  encode(src: string | LayoutObject, b: Uint8Array, offset = 0): number {
     /* Must force this to a string, lest it be a number and the
      * "utf8-encoding" below actually allocate a buffer of length
      * src */
     if ('string' !== typeof src) {
-      src = src.toString();
+      src = String(src);
     }
-    const srcb = Buffer.from(src as string, 'utf8');
+    const srcb = Buffer.from(src, 'utf8');
     const span = srcb.length;
     if ((0 <= this.maxSpan)
         && (this.maxSpan < span)) {
@@ -2599,9 +2453,9 @@ export class UTF8 extends Layout {
  *
  * @augments {Layout}
  */
-export class Constant extends Layout {
-  value: any;
-  constructor(value: any, property?: string) {
+export class Constant<T> extends Layout<T> {
+  value: T;
+  constructor(value: T, property?: string) {
     super(0, property);
 
     /** The value produced by this constant when the layout is {@link
@@ -2617,12 +2471,12 @@ export class Constant extends Layout {
   }
 
   /** @override */
-  decode(b?: Uint8Array, offset?: number) {
+  decode(b?: Uint8Array, offset?: number): T {
     return this.value;
   }
 
   /** @override */
-  encode(src: any, b?: Uint8Array, offset?: number): number {
+  encode(src: T, b?: Uint8Array, offset?: number): number {
     /* Constants take no space */
     return 0;
   }
@@ -2633,7 +2487,7 @@ export const greedy = ((elementSpan: number, property?: string) => new GreedyCou
 
 /** Factory for {@link OffsetLayout}. */
 export const offset
-  = ((layout: Layout, offset?: number, property?: string) => new OffsetLayout(layout, offset, property));
+  = ((layout: Layout<number>, offset?: number, property?: string) => new OffsetLayout(layout, offset, property));
 
 /** Factory for {@link UInt|unsigned int layouts} spanning one
  * byte. */
@@ -2753,21 +2607,21 @@ export const f64be = ((property?: string) => new DoubleBE(property));
 
 /** Factory for {@link Structure} values. */
 export const struct
-  = ((fields: Layout[], property?: string, decodePrefixes?: boolean) =>
+  = ((fields: Layout<LayoutObject>[], property?: string, decodePrefixes?: boolean) =>
     new Structure(fields, property, decodePrefixes));
 
 /** Factory for {@link BitStructure} values. */
 export const bits
-  = ((word: Layout, msb: boolean | string, property?: string) => new BitStructure(word, msb, property));
+  = ((word: UInt | UIntBE, msb: boolean | string, property?: string) => new BitStructure(word, msb, property));
 
 /** Factory for {@link Sequence} values. */
 export const seq
-  = ((elementLayout: Layout, count: number | ExternalLayout, property?: string) =>
+  = (<T>(elementLayout: Layout<T>, count: number | ExternalLayout, property?: string) =>
     new Sequence(elementLayout, count, property));
 
 /** Factory for {@link Union} values. */
 export const union
-  = ((discr: Layout | UnionDiscriminator, defaultLayout: Layout | null, property: string) =>
+  = ((discr: Layout<LayoutObject> | UnionDiscriminator, defaultLayout: Layout<LayoutObject> | null, property: string) =>
     new Union(discr, defaultLayout, property));
 
 /** Factory for {@link UnionLayoutDiscriminator} values. */
@@ -2784,4 +2638,4 @@ export const cstr = ((property?: string) => new CString(property));
 export const utf8 = ((maxSpan: number, property?: string) => new UTF8(maxSpan, property));
 
 /** Factory for {@link Constant} values. */
-export const constant = ((value: any, property?: string) => new Constant(value, property));
+export const constant = (<T>(value: T, property?: string) => new Constant(value, property));
