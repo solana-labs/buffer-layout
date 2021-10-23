@@ -1099,11 +1099,11 @@ export class Sequence<T> extends Layout<T[]> {
  *
  * @augments {Layout}
  */
-export class Structure extends Layout<LayoutObject> {
-  fields: Layout<LayoutObject>[];
+export class Structure<T> extends Layout<T> {
+  fields: Layout<T[keyof T]>[];
   decodePrefixes: boolean;
 
-  constructor(fields: Layout<LayoutObject>[], property?: string, decodePrefixes?: boolean) {
+  constructor(fields: Layout<T[keyof T]>[], property?: string, decodePrefixes?: boolean) {
     if (!(Array.isArray(fields)
           && fields.reduce((acc, v) => acc && (v instanceof Layout), true))) {
       throw new TypeError('fields must be array of Layout instances');
@@ -1173,12 +1173,12 @@ export class Structure extends Layout<LayoutObject> {
   }
 
   /** @override */
-  decode(b: Uint8Array, offset = 0): LayoutObject {
+  decode(b: Uint8Array, offset = 0): T {
     checkUint8Array(b);
-    const dest = this.makeDestinationObject();
+    const dest = this.makeDestinationObject() as T;
     for (const fd of this.fields) {
       if (undefined !== fd.property) {
-        dest[fd.property] = fd.decode(b, offset);
+        dest[fd.property as keyof T] = fd.decode(b, offset);
       }
       offset += fd.getSpan(b, offset);
       if (this.decodePrefixes
@@ -1194,7 +1194,7 @@ export class Structure extends Layout<LayoutObject> {
    * If `src` is missing a property for a member with a defined {@link
    * Layout#property|property} the corresponding region of the buffer is
    * left unmodified. */
-  encode(src: LayoutObject, b: Uint8Array, offset = 0): number {
+  encode(src: T, b: Uint8Array, offset = 0): number {
     const firstOffset = offset;
     let lastOffset = 0;
     let lastWrote = 0;
@@ -1202,7 +1202,7 @@ export class Structure extends Layout<LayoutObject> {
       let span = fd.span;
       lastWrote = (0 < span) ? span : 0;
       if (undefined !== fd.property) {
-        const fv = src[fd.property];
+        const fv = src[fd.property as keyof T];
         if (undefined !== fv) {
           lastWrote = fd.encode(fv, b, offset);
           if (0 > span) {
@@ -2607,8 +2607,8 @@ export const f64be = ((property?: string) => new DoubleBE(property));
 
 /** Factory for {@link Structure} values. */
 export const struct
-  = ((fields: Layout<LayoutObject>[], property?: string, decodePrefixes?: boolean) =>
-    new Structure(fields, property, decodePrefixes));
+  = (<T>(fields: Layout<T[keyof T]>[], property?: string, decodePrefixes?: boolean) =>
+    new Structure<T>(fields, property, decodePrefixes));
 
 /** Factory for {@link BitStructure} values. */
 export const bits
@@ -2617,7 +2617,7 @@ export const bits
 /** Factory for {@link Sequence} values. */
 export const seq
   = (<T>(elementLayout: Layout<T>, count: number | ExternalLayout, property?: string) =>
-    new Sequence(elementLayout, count, property));
+    new Sequence<T>(elementLayout, count, property));
 
 /** Factory for {@link Union} values. */
 export const union
