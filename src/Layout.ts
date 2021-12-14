@@ -174,7 +174,7 @@ export function uint8ArrayToBuffer(b: Uint8Array): Buffer {
  *
  * @abstract
  */
-export class Layout<T> {
+export abstract class Layout<T> {
   span: number;
   property?: string;
   boundConstructor_?: any;
@@ -237,9 +237,7 @@ export class Layout<T> {
    *
    * @abstract
    */
-  decode(b: Uint8Array, offset?: number): T {
-    throw new Error('Layout is abstract');
-  }
+  abstract decode(b: Uint8Array, offset?: number): T;
 
   /**
    * Encode a JavaScript value into a Uint8Array.
@@ -263,9 +261,7 @@ export class Layout<T> {
    *
    * @abstract
    */
-  encode(src: T, b: Uint8Array, offset?: number): number {
-    throw new Error('Layout is abstract');
-  }
+  abstract encode(src: T, b: Uint8Array, offset?: number): number;
 
   /**
    * Calculate the span of a specific instance of a layout.
@@ -428,7 +424,7 @@ export function bindConstructorLayout<T>(Class: any, layout: Layout<T>): void {
  * @abstract
  * @augments {Layout}
  */
-export class ExternalLayout extends Layout<number> {
+export abstract class ExternalLayout extends Layout<number> {
   /**
    * Return `true` iff the external layout decodes to an unsigned
    * integer layout.
