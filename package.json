@@ -48,12 +48,8 @@
     "docs": "shx rm -rf docs && typedoc",
     "eslint": "eslint src/ --ext .ts",
     "jsdoc": "jsdoc -c jsdoc/conf.json",
+    "pages": "gh-pages --dist docs --dotfiles",
     "prepare": "npm run build",
     "test": "npm run build && mocha -u tdd"
-  },
-  "typedocOptions": {
-    "entryPoints": "./src/Layout.ts",
-    "out": "docs",
-    "readme": "README.md"
   }
 }

@@ -15,5 +15,10 @@
     "isolatedModules": true
   },
   "include": ["src"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules"],
+  "typedocOptions": {
+    "entryPoints": ["./src/Layout.ts"],
+    "out": "docs",
+    "readme": "README.md"
+  }
 }
