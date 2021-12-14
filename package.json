@@ -45,7 +45,7 @@
     "build": "tsc",
     "coverage": "npm run build && istanbul cover _mocha -- -u tdd",
     "coveralls": "npm run build && istanbul cover _mocha --report lcovonly -- -u tdd && cat ./coverage/lcov.info | coveralls",
-    "docs": "shx rm -rf docs && typedoc",
+    "docs": "shx rm -rf docs && typedoc && shx cp .nojekyll docs/",
     "eslint": "eslint src/ --ext .ts",
     "jsdoc": "jsdoc -c jsdoc/conf.json",
     "pages": "gh-pages --dist docs --dotfiles",
