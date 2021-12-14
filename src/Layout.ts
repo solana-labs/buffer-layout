@@ -1648,7 +1648,6 @@ export class Union extends Layout<LayoutObject> {
       }
       dest = this.makeDestinationObject();
       dest[dlo.property] = discr;
-      // @FIXME: defaultLayout and defaultLayout.property aren't guaranteed
       dest[defaultLayout!.property!] = defaultLayout!.decode(b, offset + contentOffset);
     } else {
       dest = clo.decode(b, offset);
