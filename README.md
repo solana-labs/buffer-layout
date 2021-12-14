@@ -1,3 +1,14 @@
+# @solana/buffer-layout
+
+`@solana/buffer-layout` is a TypeScript fork of `buffer-layout`. Same API, just adds types and TypeScript docs.
+
+## Installation
+
+Install with `npm install @solana/buffer-layout`.
+
+Development and testing is done using Node.js, supporting versions 5.10
+and later.
+
 # buffer-layout
 
 [![NPM version](https://img.shields.io/npm/v/buffer-layout.svg)](https://www.npmjs.com/package/buffer-layout "View this project on NPM")
@@ -25,11 +36,6 @@ Layout support is provided for these types of data:
   from the least or most significant bit;
 * NUL-terminated C strings;
 * Blobs of fixed or variable-length raw data.
-
-## Installation
-
-Development and testing is done using Node.js, supporting versions 4.5
-and later.  Install with `npm install buffer-layout`.
 
 ## Examples
 

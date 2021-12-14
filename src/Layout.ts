@@ -174,7 +174,7 @@ export function uint8ArrayToBuffer(b: Uint8Array): Buffer {
  *
  * @abstract
  */
-export class Layout<T> {
+export abstract class Layout<T> {
   span: number;
   property?: string;
   boundConstructor_?: any;
@@ -237,9 +237,7 @@ export class Layout<T> {
    *
    * @abstract
    */
-  decode(b: Uint8Array, offset?: number): T {
-    throw new Error('Layout is abstract');
-  }
+  abstract decode(b: Uint8Array, offset?: number): T;
 
   /**
    * Encode a JavaScript value into a Uint8Array.
@@ -263,9 +261,7 @@ export class Layout<T> {
    *
    * @abstract
    */
-  encode(src: T, b: Uint8Array, offset?: number): number {
-    throw new Error('Layout is abstract');
-  }
+  abstract encode(src: T, b: Uint8Array, offset?: number): number;
 
   /**
    * Calculate the span of a specific instance of a layout.
@@ -377,6 +373,8 @@ export function nameWithProperty(name: string, lo: { property?: string }): strin
  * @param {Layout} layout - the {@link Layout} instance used to encode
  * instances of `Class`.
  */
+// `Class` must be a constructor Function, but the assignment of a `layout_` property to it makes it difficult to type
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function bindConstructorLayout<T>(Class: any, layout: Layout<T>): void {
   if ('function' !== typeof Class) {
     throw new TypeError('Class must be constructor');
@@ -428,7 +426,7 @@ export function bindConstructorLayout<T>(Class: any, layout: Layout<T>): void {
  * @abstract
  * @augments {Layout}
  */
-export class ExternalLayout extends Layout<number> {
+export abstract class ExternalLayout extends Layout<number> {
   /**
    * Return `true` iff the external layout decodes to an unsigned
    * integer layout.
@@ -1428,6 +1426,8 @@ export class UnionLayoutDiscriminator extends UnionDiscriminator<number> {
  * @augments {Layout}
  */
 export class Union extends Layout<LayoutObject> {
+  // `property` is assigned in the Layout constructor
+  // @ts-ignore
   property: string;
   discriminator: UnionDiscriminator;
   usesPrefixDiscriminator: boolean;
@@ -1648,6 +1648,8 @@ export class Union extends Layout<LayoutObject> {
       }
       dest = this.makeDestinationObject();
       dest[dlo.property] = discr;
+      // defaultLayout.property can be undefined, but this is allowed by buffer-layout
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       dest[defaultLayout!.property!] = defaultLayout!.decode(b, offset + contentOffset);
     } else {
       dest = clo.decode(b, offset);
@@ -1666,6 +1668,7 @@ export class Union extends Layout<LayoutObject> {
     if (undefined === vlo) {
       const dlo = this.discriminator;
       // this.defaultLayout is not undefined when vlo is undefined
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const clo = this.defaultLayout!;
       let contentOffset = 0;
       if (this.usesPrefixDiscriminator) {
@@ -1673,6 +1676,7 @@ export class Union extends Layout<LayoutObject> {
       }
       dlo.encode(src[dlo.property], b, offset);
       // clo.property is not undefined when vlo is undefined
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       return contentOffset + clo.encode(src[clo.property!], b, offset + contentOffset);
     }
     return vlo.encode(src, b, offset);
@@ -1752,6 +1756,8 @@ export class Union extends Layout<LayoutObject> {
  * @augments {Layout}
  */
 export class VariantLayout extends Layout<LayoutObject> {
+  // `property` is assigned in the Layout constructor
+  // @ts-ignore
   property: string;
   union: Union;
   variant: number;
@@ -2033,10 +2039,10 @@ export class BitStructure extends Layout<LayoutObject> {
    * Layout#property|property}.
    *
    * @return {Boolean} */
+  // `Boolean` conflicts with the native primitive type
   // eslint-disable-next-line @typescript-eslint/ban-types
   addBoolean(property: string): Boolean {
     // This is my Boolean, not the Javascript one.
-    // eslint-disable-next-line no-new-wrappers
     const bf = new Boolean(this, property);
     this.fields.push(bf);
     return bf;
@@ -2482,159 +2488,157 @@ export class Constant<T> extends Layout<T> {
 }
 
 /** Factory for {@link GreedyCount}. */
-export const greedy = ((elementSpan: number, property?: string) => new GreedyCount(elementSpan, property));
+export const greedy = ((elementSpan: number, property?: string): GreedyCount => new GreedyCount(elementSpan, property));
 
 /** Factory for {@link OffsetLayout}. */
-export const offset
-  = ((layout: Layout<number>, offset?: number, property?: string) => new OffsetLayout(layout, offset, property));
+export const offset = ((layout: Layout<number>, offset?: number, property?: string): OffsetLayout =>
+    new OffsetLayout(layout, offset, property));
 
 /** Factory for {@link UInt|unsigned int layouts} spanning one
  * byte. */
-export const u8 = ((property?: string) => new UInt(1, property));
+export const u8 = ((property?: string): UInt => new UInt(1, property));
 
 /** Factory for {@link UInt|little-endian unsigned int layouts}
  * spanning two bytes. */
-export const u16 = ((property?: string) => new UInt(2, property));
+export const u16 = ((property?: string): UInt => new UInt(2, property));
 
 /** Factory for {@link UInt|little-endian unsigned int layouts}
  * spanning three bytes. */
-export const u24 = ((property?: string) => new UInt(3, property));
+export const u24 = ((property?: string): UInt => new UInt(3, property));
 
 /** Factory for {@link UInt|little-endian unsigned int layouts}
  * spanning four bytes. */
-export const u32 = ((property?: string) => new UInt(4, property));
+export const u32 = ((property?: string): UInt => new UInt(4, property));
 
 /** Factory for {@link UInt|little-endian unsigned int layouts}
  * spanning five bytes. */
-export const u40 = ((property?: string) => new UInt(5, property));
+export const u40 = ((property?: string): UInt => new UInt(5, property));
 
 /** Factory for {@link UInt|little-endian unsigned int layouts}
  * spanning six bytes. */
-export const u48 = ((property?: string) => new UInt(6, property));
+export const u48 = ((property?: string): UInt => new UInt(6, property));
 
 /** Factory for {@link NearUInt64|little-endian unsigned int
  * layouts} interpreted as Numbers. */
-export const nu64 = ((property?: string) => new NearUInt64(property));
+export const nu64 = ((property?: string): NearUInt64 => new NearUInt64(property));
 
 /** Factory for {@link UInt|big-endian unsigned int layouts}
  * spanning two bytes. */
-export const u16be = ((property?: string) => new UIntBE(2, property));
+export const u16be = ((property?: string): UIntBE => new UIntBE(2, property));
 
 /** Factory for {@link UInt|big-endian unsigned int layouts}
  * spanning three bytes. */
-export const u24be = ((property?: string) => new UIntBE(3, property));
+export const u24be = ((property?: string): UIntBE => new UIntBE(3, property));
 
 /** Factory for {@link UInt|big-endian unsigned int layouts}
  * spanning four bytes. */
-export const u32be = ((property?: string) => new UIntBE(4, property));
+export const u32be = ((property?: string): UIntBE => new UIntBE(4, property));
 
 /** Factory for {@link UInt|big-endian unsigned int layouts}
  * spanning five bytes. */
-export const u40be = ((property?: string) => new UIntBE(5, property));
+export const u40be = ((property?: string): UIntBE => new UIntBE(5, property));
 
 /** Factory for {@link UInt|big-endian unsigned int layouts}
  * spanning six bytes. */
-export const u48be = ((property?: string) => new UIntBE(6, property));
+export const u48be = ((property?: string): UIntBE => new UIntBE(6, property));
 
 /** Factory for {@link NearUInt64BE|big-endian unsigned int
  * layouts} interpreted as Numbers. */
-export const nu64be = ((property?: string) => new NearUInt64BE(property));
+export const nu64be = ((property?: string): NearUInt64BE => new NearUInt64BE(property));
 
 /** Factory for {@link Int|signed int layouts} spanning one
  * byte. */
-export const s8 = ((property?: string) => new Int(1, property));
+export const s8 = ((property?: string): Int => new Int(1, property));
 
 /** Factory for {@link Int|little-endian signed int layouts}
  * spanning two bytes. */
-export const s16 = ((property?: string) => new Int(2, property));
+export const s16 = ((property?: string): Int => new Int(2, property));
 
 /** Factory for {@link Int|little-endian signed int layouts}
  * spanning three bytes. */
-export const s24 = ((property?: string) => new Int(3, property));
+export const s24 = ((property?: string): Int => new Int(3, property));
 
 /** Factory for {@link Int|little-endian signed int layouts}
  * spanning four bytes. */
-export const s32 = ((property?: string) => new Int(4, property));
+export const s32 = ((property?: string): Int => new Int(4, property));
 
 /** Factory for {@link Int|little-endian signed int layouts}
  * spanning five bytes. */
-export const s40 = ((property?: string) => new Int(5, property));
+export const s40 = ((property?: string): Int => new Int(5, property));
 
 /** Factory for {@link Int|little-endian signed int layouts}
  * spanning six bytes. */
-export const s48 = ((property?: string) => new Int(6, property));
+export const s48 = ((property?: string): Int => new Int(6, property));
 
 /** Factory for {@link NearInt64|little-endian signed int layouts}
  * interpreted as Numbers. */
-export const ns64 = ((property?: string) => new NearInt64(property));
+export const ns64 = ((property?: string): NearInt64 => new NearInt64(property));
 
 /** Factory for {@link Int|big-endian signed int layouts}
  * spanning two bytes. */
-export const s16be = ((property?: string) => new IntBE(2, property));
+export const s16be = ((property?: string): IntBE => new IntBE(2, property));
 
 /** Factory for {@link Int|big-endian signed int layouts}
  * spanning three bytes. */
-export const s24be = ((property?: string) => new IntBE(3, property));
+export const s24be = ((property?: string): IntBE => new IntBE(3, property));
 
 /** Factory for {@link Int|big-endian signed int layouts}
  * spanning four bytes. */
-export const s32be = ((property?: string) => new IntBE(4, property));
+export const s32be = ((property?: string): IntBE => new IntBE(4, property));
 
 /** Factory for {@link Int|big-endian signed int layouts}
  * spanning five bytes. */
-export const s40be = ((property?: string) => new IntBE(5, property));
+export const s40be = ((property?: string): IntBE => new IntBE(5, property));
 
 /** Factory for {@link Int|big-endian signed int layouts}
  * spanning six bytes. */
-export const s48be = ((property?: string) => new IntBE(6, property));
+export const s48be = ((property?: string): IntBE => new IntBE(6, property));
 
 /** Factory for {@link NearInt64BE|big-endian signed int layouts}
  * interpreted as Numbers. */
-export const ns64be = ((property?: string) => new NearInt64BE(property));
+export const ns64be = ((property?: string): NearInt64BE => new NearInt64BE(property));
 
 /** Factory for {@link Float|little-endian 32-bit floating point} values. */
-export const f32 = ((property?: string) => new Float(property));
+export const f32 = ((property?: string): Float => new Float(property));
 
 /** Factory for {@link FloatBE|big-endian 32-bit floating point} values. */
-export const f32be = ((property?: string) => new FloatBE(property));
+export const f32be = ((property?: string): FloatBE => new FloatBE(property));
 
 /** Factory for {@link Double|little-endian 64-bit floating point} values. */
-export const f64 = ((property?: string) => new Double(property));
+export const f64 = ((property?: string): Double => new Double(property));
 
 /** Factory for {@link DoubleBE|big-endian 64-bit floating point} values. */
-export const f64be = ((property?: string) => new DoubleBE(property));
+export const f64be = ((property?: string): DoubleBE => new DoubleBE(property));
 
 /** Factory for {@link Structure} values. */
-export const struct
-  = (<T>(fields: Layout<T[keyof T]>[], property?: string, decodePrefixes?: boolean) =>
+export const struct = (<T>(fields: Layout<T[keyof T]>[], property?: string, decodePrefixes?: boolean): Structure<T> =>
     new Structure<T>(fields, property, decodePrefixes));
 
 /** Factory for {@link BitStructure} values. */
-export const bits
-  = ((word: UInt | UIntBE, msb: boolean | string, property?: string) => new BitStructure(word, msb, property));
+export const bits = ((word: UInt | UIntBE, msb: boolean | string, property?: string): BitStructure =>
+    new BitStructure(word, msb, property));
 
 /** Factory for {@link Sequence} values. */
-export const seq
-  = (<T>(elementLayout: Layout<T>, count: number | ExternalLayout, property?: string) =>
+export const seq = (<T>(elementLayout: Layout<T>, count: number | ExternalLayout, property?: string): Sequence<T> =>
     new Sequence<T>(elementLayout, count, property));
 
 /** Factory for {@link Union} values. */
-export const union
-  = ((discr: Layout<LayoutObject> | UnionDiscriminator, defaultLayout: Layout<LayoutObject> | null, property: string) =>
+export const union = ((discr: Layout<LayoutObject> | UnionDiscriminator,
+                       defaultLayout: Layout<LayoutObject> | null, property: string): Union =>
     new Union(discr, defaultLayout, property));
 
 /** Factory for {@link UnionLayoutDiscriminator} values. */
-export const unionLayoutDiscriminator
-  = ((layout: ExternalLayout, property: string) => new UnionLayoutDiscriminator(layout, property));
+export const unionLayoutDiscriminator = ((layout: ExternalLayout, property: string): UnionLayoutDiscriminator =>
+    new UnionLayoutDiscriminator(layout, property));
 
 /** Factory for {@link Blob} values. */
-export const blob = ((length: number | ExternalLayout, property?: string) => new Blob(length, property));
+export const blob = ((length: number | ExternalLayout, property?: string): Blob => new Blob(length, property));
 
 /** Factory for {@link CString} values. */
-export const cstr = ((property?: string) => new CString(property));
+export const cstr = ((property?: string): CString => new CString(property));
 
 /** Factory for {@link UTF8} values. */
-export const utf8 = ((maxSpan: number, property?: string) => new UTF8(maxSpan, property));
+export const utf8 = ((maxSpan: number, property?: string): UTF8 => new UTF8(maxSpan, property));
 
 /** Factory for {@link Constant} values. */
-export const constant = (<T>(value: T, property?: string) => new Constant(value, property));
+export const constant = (<T>(value: T, property?: string): Constant<T> => new Constant(value, property));
