@@ -373,6 +373,8 @@ export function nameWithProperty(name: string, lo: { property?: string }): strin
  * @param {Layout} layout - the {@link Layout} instance used to encode
  * instances of `Class`.
  */
+// `Class` must be a constructor Function, but the assignment of a `layout_` property to it makes it difficult to type
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function bindConstructorLayout<T>(Class: any, layout: Layout<T>): void {
   if ('function' !== typeof Class) {
     throw new TypeError('Class must be constructor');
@@ -1424,6 +1426,8 @@ export class UnionLayoutDiscriminator extends UnionDiscriminator<number> {
  * @augments {Layout}
  */
 export class Union extends Layout<LayoutObject> {
+  // `property` is assigned in the Layout constructor
+  // @ts-ignore
   property: string;
   discriminator: UnionDiscriminator;
   usesPrefixDiscriminator: boolean;
@@ -1644,6 +1648,8 @@ export class Union extends Layout<LayoutObject> {
       }
       dest = this.makeDestinationObject();
       dest[dlo.property] = discr;
+      // defaultLayout.property can be undefined, but this is allowed by buffer-layout
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       dest[defaultLayout!.property!] = defaultLayout!.decode(b, offset + contentOffset);
     } else {
       dest = clo.decode(b, offset);
@@ -1662,6 +1668,7 @@ export class Union extends Layout<LayoutObject> {
     if (undefined === vlo) {
       const dlo = this.discriminator;
       // this.defaultLayout is not undefined when vlo is undefined
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const clo = this.defaultLayout!;
       let contentOffset = 0;
       if (this.usesPrefixDiscriminator) {
@@ -1669,6 +1676,7 @@ export class Union extends Layout<LayoutObject> {
       }
       dlo.encode(src[dlo.property], b, offset);
       // clo.property is not undefined when vlo is undefined
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       return contentOffset + clo.encode(src[clo.property!], b, offset + contentOffset);
     }
     return vlo.encode(src, b, offset);
@@ -1748,6 +1756,8 @@ export class Union extends Layout<LayoutObject> {
  * @augments {Layout}
  */
 export class VariantLayout extends Layout<LayoutObject> {
+  // `property` is assigned in the Layout constructor
+  // @ts-ignore
   property: string;
   union: Union;
   variant: number;
@@ -2029,10 +2039,10 @@ export class BitStructure extends Layout<LayoutObject> {
    * Layout#property|property}.
    *
    * @return {Boolean} */
+  // `Boolean` conflicts with the native primitive type
   // eslint-disable-next-line @typescript-eslint/ban-types
   addBoolean(property: string): Boolean {
     // This is my Boolean, not the Javascript one.
-    // eslint-disable-next-line no-new-wrappers
     const bf = new Boolean(this, property);
     this.fields.push(bf);
     return bf;
