@@ -8,11 +8,11 @@
     "endian",
     "pack data"
   ],
-  "homepage": "https://github.com/pabigot/buffer-layout",
-  "bugs": "https://github.com/pabigot/buffer-layout/issues",
+  "homepage": "https://github.com/solana-labs/buffer-layout",
+  "bugs": "https://github.com/solana-labs/buffer-layout/issues",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pabigot/buffer-layout.git"
+    "url": "https://github.com/solana-labs/buffer-layout.git"
   },
   "license": "MIT",
   "author": "Peter A. Bigot <pab@pabigot.com>",
