@@ -1438,7 +1438,7 @@ export class Union extends Layout<LayoutObject> {
   configGetSourceVariant: (getSourceVariant: (src: LayoutObject) => VariantLayout | undefined) => void;
 
   constructor(
-      discr: Layout<LayoutObject> | UnionDiscriminator,
+      discr: UInt | UIntBE | ExternalLayout | UnionDiscriminator,
       defaultLayout?: Layout<LayoutObject> | null,
       property?: string
   ) {
@@ -2623,7 +2623,7 @@ export const seq = (<T>(elementLayout: Layout<T>, count: number | ExternalLayout
     new Sequence<T>(elementLayout, count, property));
 
 /** Factory for {@link Union} values. */
-export const union = ((discr: Layout<LayoutObject> | UnionDiscriminator,
+export const union = ((discr: UInt | UIntBE | ExternalLayout | UnionDiscriminator,
                        defaultLayout?: Layout<LayoutObject> | null, property?: string): Union =>
     new Union(discr, defaultLayout, property));
 
