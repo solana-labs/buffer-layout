@@ -295,8 +295,8 @@ export abstract class Layout<T, P = string> {
    * @returns {Layout} - the copy with {@link Layout#property|property}
    * set to `property`.
    */
-  replicate(property: P): this {
-    const rv = Object.create(this.constructor.prototype) as this;
+  replicate<NEWP extends string>(property: NEWP): Layout<T, NEWP> {
+    const rv = Object.create(this.constructor.prototype) as Layout<T, NEWP>;
     Object.assign(rv, this);
     rv.property = property;
     return rv;
@@ -1429,24 +1429,22 @@ export class UnionLayoutDiscriminator<P extends string> extends UnionDiscriminat
  *
  * @augments {Layout}
  */
-export class Union<P extends string> extends Layout<LayoutObject> {
-  // `property` is assigned in the Layout constructor
-  // @ts-ignore
-  property: P;
-  discriminator: UnionDiscriminator;
+export class Union<P extends string> extends Layout<any, P> {
+  property!: P;
+  discriminator: UnionDiscriminator<any, P>;
   usesPrefixDiscriminator: boolean;
-  defaultLayout: Layout<LayoutObject> | null;
-  registry: {[key: number]: VariantLayout};
+  defaultLayout: Layout<any, P> | Layout<any, 'content'> | null;
+  registry: {[key: number]: VariantLayout<any, P>};
 
-  getSourceVariant: (src: LayoutObject) => VariantLayout | undefined;
-  configGetSourceVariant: (getSourceVariant: (src: LayoutObject) => VariantLayout | undefined) => void;
+  getSourceVariant: (src: any) => VariantLayout<any, P> | undefined;
+  configGetSourceVariant: (getSourceVariant: (src: any) => VariantLayout<any, P> | undefined) => void;
 
   constructor(
-      discr: UInt<any> | UIntBE<any> | ExternalLayout<any> | UnionDiscriminator,
-      defaultLayout?: Layout<LayoutObject> | null,
+      discr: UInt<any> | UIntBE<any> | ExternalLayout<any> | UnionDiscriminator<any, P>,
+      defaultLayout?: Layout<any, P> | Layout<any, 'content'> | null,
       property?: P
   ) {
-    let discriminator: UnionDiscriminator;
+    let discriminator: UnionDiscriminator<any, P>;
     if ((discr instanceof UInt)
         || (discr instanceof UIntBE)) {
       discriminator = new UnionLayoutDiscriminator(new OffsetLayout(discr));
@@ -1610,7 +1608,7 @@ export class Union<P extends string> extends Layout<LayoutObject> {
    * @throws {Error} - if `src` cannot be associated with a default or
    * registered variant.
    */
-  defaultGetSourceVariant(src: LayoutObject): VariantLayout | undefined {
+  defaultGetSourceVariant(src: any): VariantLayout<any, P> | undefined {
     if (Object.prototype.hasOwnProperty.call(src, this.discriminator.property)) {
       if (this.defaultLayout && this.defaultLayout.property
           && Object.prototype.hasOwnProperty.call(src, this.defaultLayout.property)) {
@@ -1639,8 +1637,8 @@ export class Union<P extends string> extends Layout<LayoutObject> {
    * value is an instance of that variant, with no explicit
    * discriminator.  Otherwise the {@link Union#defaultLayout|default
    * layout} is used to decode the content. */
-  decode(b: Uint8Array, offset = 0): LayoutObject {
-    let dest: LayoutObject;
+  decode(b: Uint8Array, offset = 0): any {
+    let dest: any;
     const dlo = this.discriminator;
     const discr = dlo.decode(b, offset);
     const clo = this.registry[discr];
@@ -1648,7 +1646,7 @@ export class Union<P extends string> extends Layout<LayoutObject> {
       const defaultLayout = this.defaultLayout;
       let contentOffset = 0;
       if (this.usesPrefixDiscriminator) {
-        contentOffset = (dlo as UnionLayoutDiscriminator).layout.span;
+        contentOffset = (dlo as UnionLayoutDiscriminator<any>).layout.span;
       }
       dest = this.makeDestinationObject();
       dest[dlo.property] = discr;
@@ -1667,7 +1665,7 @@ export class Union<P extends string> extends Layout<LayoutObject> {
    * {@link Union#defaultLayout|default layout}.  To encode variants
    * use the appropriate variant-specific {@link VariantLayout#encode}
    * method. */
-  encode(src: LayoutObject, b: Uint8Array, offset = 0): number {
+  encode(src: any, b: Uint8Array, offset = 0): number {
     const vlo = this.getSourceVariant(src);
     if (undefined === vlo) {
       const dlo = this.discriminator;
@@ -1676,7 +1674,7 @@ export class Union<P extends string> extends Layout<LayoutObject> {
       const clo = this.defaultLayout!;
       let contentOffset = 0;
       if (this.usesPrefixDiscriminator) {
-        contentOffset = (dlo as UnionLayoutDiscriminator).layout.span;
+        contentOffset = (dlo as UnionLayoutDiscriminator<any>).layout.span;
       }
       dlo.encode(src[dlo.property], b, offset);
       // clo.property is not undefined when vlo is undefined
@@ -1699,8 +1697,8 @@ export class Union<P extends string> extends Layout<LayoutObject> {
    * Layout#property|property}.
    *
    * @return {VariantLayout} */
-  addVariant(variant: number, layout: Layout<LayoutObject>, property: string): VariantLayout {
-    const rv = new VariantLayout(this, variant, layout, property);
+  addVariant<X extends Record<string, any>>(variant: number, layout: Layout<X, any>, property: P): VariantLayout<X,P> {
+    const rv = new VariantLayout<X,P>(this, variant, layout, property);
     this.registry[variant] = rv;
     return rv;
   }
@@ -1719,7 +1717,7 @@ export class Union<P extends string> extends Layout<LayoutObject> {
    *
    * @return {({VariantLayout}|undefined)}
    */
-  getVariant(vb: Uint8Array | number, offset = 0): VariantLayout | undefined {
+  getVariant(vb: Uint8Array | number, offset = 0): VariantLayout<any, P> | undefined {
     let variant: number;
     if (vb instanceof Uint8Array) {
       variant = this.discriminator.decode(vb, offset);
@@ -1759,14 +1757,12 @@ export class Union<P extends string> extends Layout<LayoutObject> {
  *
  * @augments {Layout}
  */
-export class VariantLayout extends Layout<LayoutObject> {
-  // `property` is assigned in the Layout constructor
-  // @ts-ignore
-  property: string;
-  union: Union;
+export class VariantLayout<T extends Record<string, unknown>, P extends string> extends Layout<T, P> {
+  // property!: P;
+  union: Union<P>;
   variant: number;
-  layout: Layout<LayoutObject> | null;
-  constructor(union: Union, variant: number, layout: Layout<LayoutObject> | null, property: string) {
+  layout: Layout<any, any> | null;
+  constructor(union: Union<P>, variant: number, layout: Layout<any, any> | null, property: P) {
     if (!(union instanceof Union)) {
       throw new TypeError('union must be a Union');
     }
@@ -1795,7 +1791,7 @@ export class VariantLayout extends Layout<LayoutObject> {
     if (0 > union.span) {
       span = layout ? layout.span : 0;
       if ((0 <= span) && union.usesPrefixDiscriminator) {
-        span += (union.discriminator as UnionLayoutDiscriminator).layout.span;
+        span += (union.discriminator as UnionLayoutDiscriminator<any>).layout.span;
       }
     }
     super(span, property);
@@ -1824,7 +1820,7 @@ export class VariantLayout extends Layout<LayoutObject> {
     }
     let contentOffset = 0;
     if (this.union.usesPrefixDiscriminator) {
-      contentOffset = (this.union.discriminator as UnionLayoutDiscriminator).layout.span;
+      contentOffset = (this.union.discriminator as UnionLayoutDiscriminator<any>).layout.span;
     }
     /* Span is defined solely by the variant (and prefix discriminator) */
     let span = 0;
@@ -1834,40 +1830,39 @@ export class VariantLayout extends Layout<LayoutObject> {
     return contentOffset + span;
   }
 
-  /** @override */
-  decode(b: Uint8Array, offset = 0): LayoutObject {
+  decode(b: Uint8Array, offset = 0): T {
     const dest = this.makeDestinationObject();
     if (this !== this.union.getVariant(b, offset)) {
       throw new Error('variant mismatch');
     }
     let contentOffset = 0;
     if (this.union.usesPrefixDiscriminator) {
-      contentOffset = (this.union.discriminator as UnionLayoutDiscriminator).layout.span;
+      contentOffset = (this.union.discriminator as UnionLayoutDiscriminator<any>).layout.span;
     }
     if (this.layout) {
-      dest[this.property] = this.layout.decode(b, offset + contentOffset);
+      dest[this.property!] = this.layout.decode(b, offset + contentOffset);
     } else if (this.property) {
-      dest[this.property] = true;
+      dest[this.property!] = true as unknown as any;
     } else if (this.union.usesPrefixDiscriminator) {
-      dest[this.union.discriminator.property] = this.variant;
+      dest[this.union.discriminator.property] = this.variant as unknown as any;
     }
     return dest;
   }
 
   /** @override */
-  encode(src: LayoutObject, b: Uint8Array, offset = 0): number {
+  encode(src: T, b: Uint8Array, offset = 0): number {
     let contentOffset = 0;
     if (this.union.usesPrefixDiscriminator) {
-      contentOffset = (this.union.discriminator as UnionLayoutDiscriminator).layout.span;
+      contentOffset = (this.union.discriminator as UnionLayoutDiscriminator<any>).layout.span;
     }
     if (this.layout
-        && (!Object.prototype.hasOwnProperty.call(src, this.property))) {
+        && (!Object.prototype.hasOwnProperty.call(src, this.property!))) {
       throw new TypeError('variant lacks property ' + this.property);
     }
     this.union.discriminator.encode(this.variant, b, offset);
     let span = contentOffset;
     if (this.layout) {
-      this.layout.encode(src[this.property], b, offset + contentOffset);
+      this.layout.encode(src[this.property!], b, offset + contentOffset);
       span += this.layout.getSpan(b, offset + contentOffset);
       if ((0 <= this.union.span)
           && (span > this.union.span)) {
@@ -1879,7 +1874,7 @@ export class VariantLayout extends Layout<LayoutObject> {
 
   /** Delegate {@link Layout#fromArray|fromArray} to {@link
    * VariantLayout#layout|layout}. */
-  fromArray(values: any[]): LayoutObject | undefined {
+  fromArray(values: any[]): T | undefined {
     if (this.layout) {
       return this.layout.fromArray(values);
     }
@@ -1899,7 +1894,16 @@ function fixBitwiseResult(v: number): number {
   }
   return v;
 }
-
+export type BitStructObj<T> = T extends BitField<infer Property, any>[]
+  ? {
+    [K in Exclude<Extract<Property, string>, ''>]: Extract<
+      T[number],
+      BitField<K, any>
+    > extends BitField<any, any>
+      ? number
+      : any;
+  }
+  : any
 /**
  * Contain a sequence of bit fields as an unsigned integer.
  *
@@ -1931,8 +1935,8 @@ function fixBitwiseResult(v: number): number {
  *
  * @augments {Layout}
  */
-export class BitStructure<P extends string> extends Layout<LayoutObject, P> {
-  fields: BitField[];
+export class BitStructure<T extends BitField<any, any>[], P extends string> extends Layout<BitStructObj<T>, P> {
+  fields: T;
   word: UInt<any> | UIntBE<any>;
   msb: boolean;
 
@@ -1974,7 +1978,7 @@ export class BitStructure<P extends string> extends Layout<LayoutObject, P> {
      * **NOTE** The array remains mutable to allow fields to be {@link
      * BitStructure#addField|added} after construction.  Users should
      * not manipulate the content of this property.*/
-    this.fields = [];
+    this.fields = [] as unknown as T;
 
     /* Storage for the value.  Capture a variable instead of using an
      * instance property because we don't want anything to change the
@@ -1990,13 +1994,13 @@ export class BitStructure<P extends string> extends Layout<LayoutObject, P> {
   }
 
   /** @override */
-  decode(b: Uint8Array, offset = 0): LayoutObject {
+  decode(b: Uint8Array, offset = 0): BitStructObj<T> {
     const dest = this.makeDestinationObject();
     const value = this.word.decode(b, offset);
     this._packedSetValue(value);
     for (const fd of this.fields) {
       if (undefined !== fd.property) {
-        dest[fd.property] = fd.decode(b);
+        dest[fd.property as unknown as keyof BitStructObj<T>] = fd.decode(b);
       }
     }
     return dest;
@@ -2007,7 +2011,7 @@ export class BitStructure<P extends string> extends Layout<LayoutObject, P> {
    * If `src` is missing a property for a member with a defined {@link
    * Layout#property|property} the corresponding region of the packed
    * value is left unmodified.  Unused bits are also left unmodified. */
-  encode(src: LayoutObject, b: Uint8Array, offset = 0): number {
+  encode(src: BitStructObj<T>, b: Uint8Array, offset = 0): number {
     const value = this.word.decode(b, offset);
     this._packedSetValue(value);
     for (const fd of this.fields) {
@@ -2060,7 +2064,7 @@ export class BitStructure<P extends string> extends Layout<LayoutObject, P> {
    * @return {BitField} - the field associated with `property`, or
    * undefined if there is no such property.
    */
-  fieldFor(property: string): BitField | undefined {
+  fieldFor<X extends string>(property: X): BitField<X, any> | undefined {
     if ('string' !== typeof property) {
       throw new TypeError('property must be string');
     }
@@ -2093,14 +2097,14 @@ export class BitStructure<P extends string> extends Layout<LayoutObject, P> {
  * @param {string} [property] - initializer for {@link
  * Layout#property|property}.
  */
-export class BitField<P extends string> {
-  container: BitStructure<any>;
+export class BitField<P extends string, Type=number> {
+  container: BitStructure<any, any>;
   bits: number;
   valueMask: number;
   start: number;
   wordMask: number;
   property: P;
-  constructor(container: BitStructure<any>, bits: number, property: P) {
+  constructor(container: BitStructure<BitField<any>[], any>, bits: number, property: P) {
     if (!(container instanceof BitStructure)) {
       throw new TypeError('container must be a BitStructure');
     }
@@ -2156,10 +2160,13 @@ export class BitField<P extends string> {
      * decoded Object. */
     this.property = property;
   }
-
   /** Store a value into the corresponding subsequence of the containing
    * bit field. */
-  decode(b?: Uint8Array, offset?: number): unknown {
+  decode(b?: Uint8Array, offset?: number): Type {
+    return this._decode(b, offset) as unknown as Type
+  }
+
+  protected _decode(b?: Uint8Array, offset?: number): number {
     const word = this.container._packedGetValue();
     const wordValue = fixBitwiseResult(word & this.wordMask);
     const value = wordValue >>> this.start;
@@ -2171,7 +2178,11 @@ export class BitField<P extends string> {
    *
    * **NOTE** This is not a specialization of {@link
    * Layout#encode|Layout.encode} and there is no return value. */
-  encode(value: unknown): void {
+  encode(value: Type): void {
+    return this._encode(value as unknown as number);
+  }
+
+  protected _encode(value: number): void {
     if ('number' !== typeof value
         || !Number.isInteger(value)
         || (value !== fixBitwiseResult(value & this.valueMask))) {
@@ -2202,8 +2213,8 @@ export class BitField<P extends string> {
  * @augments {BitField}
  */
 /* eslint-disable no-extend-native */
-export class Boolean<P extends string> extends BitField<P> {
-  constructor(container: BitStructure<P>, property: P) {
+export class Boolean<P extends string> extends BitField<P, boolean> {
+  constructor(container: BitStructure<BitField<any>[], any>, property: P) {
     super(container, 1, property);
   }
 
@@ -2211,7 +2222,7 @@ export class Boolean<P extends string> extends BitField<P> {
    *
    * @returns {boolean} */
   decode(b?: Uint8Array, offset?: number): boolean {
-    return !!super.decode(b, offset);
+    return !!super._decode(b, offset);
   }
 
   /** @override */
@@ -2220,7 +2231,7 @@ export class Boolean<P extends string> extends BitField<P> {
       // BitField requires integer values
       value = +value;
     }
-    super.encode(value);
+    super._encode(value);
   }
 }
 /* eslint-enable no-extend-native */
@@ -2616,35 +2627,40 @@ export const f64 = <P extends string>(property?: P): Double<P> => new Double(pro
 export const f64be = <P extends string>(property?: P): DoubleBE<P> => new DoubleBE(property);
 
 /** Factory for {@link Structure} values. */
-export const struct = (<T extends Layout<T, any>[], Property extends string>
+export const struct = <T extends Layout<any>[], Property extends string>
   (fields: T, property?: Property, decodePrefixes?: boolean): Structure<T, Property> =>
-    new Structure(fields, property, decodePrefixes));
+    new Structure(fields, property, decodePrefixes);
 
 /** Factory for {@link BitStructure} values. */
-export const bits = (<P extends string>(word: UInt<P> | UIntBE<P>, msb: boolean | string, property?: P): BitStructure<P> =>
-    new BitStructure(word, msb, property));
+export const bits = <T extends BitField<any,any>[], P extends string>
+  (word: UInt<P> | UIntBE<P>, msb: boolean | P, property?: P): BitStructure<T, P> =>
+    new BitStructure<T,P>(word, msb, property);
 
 /** Factory for {@link Sequence} values. */
-export const seq = (<T>(elementLayout: Layout<T>, count: number | ExternalLayout, property?: string): Sequence<T> =>
-    new Sequence<T>(elementLayout, count, property));
+export const seq = <T, P extends string>(elementLayout: Layout<T>, count: number | ExternalLayout<any>, property?: P)
+  : Sequence<T, P> => new Sequence(elementLayout, count, property);
 
 /** Factory for {@link Union} values. */
-export const union = (<P extends string>(discr: UInt<P> | UIntBE<P> | ExternalLayout<P> | UnionDiscriminator,
-                       defaultLayout?: Layout<LayoutObject> | null, property?: string): Union =>
-    new Union(discr, defaultLayout, property));
+// eslint-disable-next-line max-len
+export const union = <P extends string>(discr: UInt<any> | UIntBE<any> | ExternalLayout<any> | UnionDiscriminator<any, P>,
+                       defaultLayout?: Layout<any, P> | null, property?: P): Union<P> => {
+  return new Union(discr, defaultLayout, property);
+};
 
 /** Factory for {@link UnionLayoutDiscriminator} values. */
-export const unionLayoutDiscriminator = ((layout: ExternalLayout, property?: string): UnionLayoutDiscriminator =>
-    new UnionLayoutDiscriminator(layout, property));
+export const unionLayoutDiscriminator = <P extends string>(layout: ExternalLayout<any>, property?: P)
+  : UnionLayoutDiscriminator<P> => new UnionLayoutDiscriminator(layout, property);
 
 /** Factory for {@link Blob} values. */
-export const blob = ((length: number | ExternalLayout, property?: string): Blob => new Blob(length, property));
+export const blob = <P extends string>(length: number | ExternalLayout<any>, property?: P)
+  : Blob<P> => new Blob(length, property);
 
 /** Factory for {@link CString} values. */
 export const cstr = <P extends string>(property?: P): CString<P> => new CString(property);
 
 /** Factory for {@link UTF8} values. */
-export const utf8 = ((maxSpan: number, property?: string): UTF8 => new UTF8(maxSpan, property));
+export const utf8 = <P extends string>(maxSpan: number, property?: P): UTF8<P> => new UTF8(maxSpan, property);
 
 /** Factory for {@link Constant} values. */
-export const constant = (<T>(value: T, property?: string): Constant<T> => new Constant(value, property));
+export const constant = <T, P extends string>(value: T, property?: P)
+  : Constant<T, P> => new Constant(value, property);
