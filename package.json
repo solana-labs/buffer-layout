@@ -36,7 +36,7 @@
     "mocha": "~5.0.4",
     "shx": "^0.3.3",
     "typedoc": "^0.22.10",
-    "typescript": "^4.4.4"
+    "typescript": "^5.7.2"
   },
   "engines": {
     "node": ">=5.10"

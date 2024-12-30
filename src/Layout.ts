@@ -975,7 +975,7 @@ export class Sequence<T, P extends string> extends Layout<T[]> {
       throw new TypeError('elementLayout must be a Layout');
     }
     if (!(((count instanceof ExternalLayout) && count.isCount())
-          || (Number.isInteger(count) && (0 <= count)))) {
+          || ('number' === typeof count && Number.isInteger(count) && (0 <= count)))) {
       throw new TypeError('count must be non-negative integer '
                           + 'or an unsigned integer ExternalLayout');
     }
@@ -2254,7 +2254,7 @@ export class Blob<P extends string> extends Layout<Uint8Array, P> {
   length: number | ExternalLayout<any>;
   constructor(length: number | ExternalLayout<any>, property?: P) {
     if (!(((length instanceof ExternalLayout) && length.isCount())
-          || (Number.isInteger(length) && (0 <= length)))) {
+          || ('number' === typeof length && Number.isInteger(length) && (0 <= length)))) {
       throw new TypeError('length must be positive integer '
                           + 'or an unsigned integer ExternalLayout');
     }
