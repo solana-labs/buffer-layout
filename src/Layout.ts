@@ -1436,17 +1436,16 @@ export class UnionLayoutDiscriminator<P extends string = string> extends UnionDi
  */
 // eslint-disable-next-line max-len
 export class Union<P extends string | undefined = string, D extends string = string, DLP extends string = string> extends Layout<any, P> {
-  property!: P;
   discriminator: UnionDiscriminator<any, D>;
   usesPrefixDiscriminator: boolean;
   defaultLayout?: Layout<any, DLP>;
-  registry: {[key: number]: VariantLayout<any, P, D>};
+  registry: {[key: number]: VariantLayout<any, P, D, string>};
 
-  getSourceVariant: (src: any) => VariantLayout<any, P, D> | undefined;
-  configGetSourceVariant: (getSourceVariant: (src: any) => VariantLayout<any, P, D> | undefined) => void;
+  getSourceVariant: (src: any) => VariantLayout<any, P, D, string> | undefined;
+  configGetSourceVariant: (getSourceVariant: (src: any) => VariantLayout<any, P, D, string> | undefined) => void;
 
   constructor(
-    discr: UInt<any> | UIntBE<any> | ExternalLayout<any> | UnionDiscriminator<any, D>,
+    discr: UInt<D> | UIntBE<D> | ExternalLayout<D> | UnionDiscriminator<any, D>,
     defaultLayout?: Layout<any, 'content' extends DLP ? DLP | undefined : DLP> | null,
     property?: P
   ) {
@@ -1613,7 +1612,7 @@ export class Union<P extends string | undefined = string, D extends string = str
    * @throws {Error} - if `src` cannot be associated with a default or
    * registered variant.
    */
-  defaultGetSourceVariant(src: any): VariantLayout<any, P, D> | undefined {
+  defaultGetSourceVariant(src: any): VariantLayout<any, P, D, string> | undefined {
     if (Object.prototype.hasOwnProperty.call(src, this.discriminator.property)) {
       if (this.defaultLayout && this.defaultLayout.property
           && Object.prototype.hasOwnProperty.call(src, this.defaultLayout.property)) {
@@ -1702,9 +1701,9 @@ export class Union<P extends string | undefined = string, D extends string = str
    * Layout#property|property}.
    *
    * @return {VariantLayout} */
-  addVariant<X extends {[K in D]: unknown}>(variant: number, layout: Layout<X, any>, property: D):
-      VariantLayout<X, P, D> {
-    const rv = new VariantLayout<X, P, D>(this, variant, layout, property);
+  addVariant<X extends Record<string, unknown>>(variant: number, layout: Layout<X, any> | null, property?: string):
+      VariantLayout<X, P, D, string> {
+    const rv = new VariantLayout<X, P, D, string>(this, variant, layout, property);
     this.registry[variant] = rv;
     return rv;
   }
@@ -1723,7 +1722,7 @@ export class Union<P extends string | undefined = string, D extends string = str
    *
    * @return {({VariantLayout}|undefined)}
    */
-  getVariant(vb: Uint8Array | number, offset = 0): VariantLayout<any, P, D> | undefined {
+  getVariant(vb: Uint8Array | number, offset = 0): VariantLayout<any, P, D, string> | undefined {
     let variant: number;
     if (vb instanceof Uint8Array) {
       variant = this.discriminator.decode(vb, offset);
@@ -1763,20 +1762,23 @@ export class Union<P extends string | undefined = string, D extends string = str
  *
  * @augments {Layout}
  */
-export class VariantLayout<T extends {[K in D]: unknown}, P extends string | undefined, D extends string>
-    extends Layout<T, D> {
-  union: Union<P, D>;
+export class VariantLayout<
+  T extends {[K in UDP | VP]: unknown},
+  UP extends string | undefined,
+  UDP extends string,
+  VP extends string,
+> extends Layout<T, VP> {
+  union: Union<UP, UDP>;
   variant: number;
   layout: Layout<any, any> | null;
-  constructor(union: Union<P, D>, variant: number, layout: Layout<any, any> | null, property: D) {
+  constructor(union: Union<UP, UDP>, variant: number, layout: Layout<any, any> | null | VP, property?: VP) {
     if (!(union instanceof Union)) {
       throw new TypeError('union must be a Union');
     }
     if ((!Number.isInteger(variant)) || (0 > variant)) {
       throw new TypeError('variant must be a (non-negative) integer');
     }
-    if (('string' === typeof layout)
-        && (undefined === property)) {
+    if ('string' === typeof layout) {
       property = layout;
       layout = null;
     }

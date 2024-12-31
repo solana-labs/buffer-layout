@@ -29,4 +29,22 @@ suite('Typed Examples', () => {
         const o2 = layout.decode(buf, 0)
         assert.deepStrictEqual(o, o2)
     })
+
+    test('Option union round-trip', () => {
+        const counter = lo.u32('counter')
+        const option = lo.union(lo.u8('is_some'))
+        option.addVariant(0, null, 'none')
+        option.addVariant(1, lo.struct([counter]), 'some')
+
+        const noneObj = {'none': true}
+        const buf = Buffer.alloc(100)
+        option.encode(noneObj, buf)
+        const noneDecode = option.decode(buf, 0)
+        assert.deepStrictEqual(noneObj, noneDecode)
+
+        const someObj = {'some': {'counter': 10}}
+        option.encode(someObj, buf)
+        const someDecode = option.decode(buf, 0)
+        assert.deepStrictEqual(someObj, someDecode)
+    })
 })
