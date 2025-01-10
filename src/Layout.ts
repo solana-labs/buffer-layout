@@ -57,7 +57,7 @@
  *   module:Layout.nu64|unsigned little-endian}, {@link
  *   module:Layout.nu64be|unsigned big-endian}, {@link
  *   module:Layout.ns64|signed little-endian}, and {@link
- *   module:Layout.ns64be|unsigned big-endian} encodings;
+ *   module:Layout.ns64be|signed big-endian} encodings;
  * * 32-bit floating point values with {@link
  *   module:Layout.f32|little-endian} and {@link
  *   module:Layout.f32be|big-endian} representations;
